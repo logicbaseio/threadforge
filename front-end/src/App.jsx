@@ -23,7 +23,7 @@ import {
 // --- CONFIGURATION ---
 // TODO: PASTE YOUR RENDER URL BELOW inside the quotes
 // Example: "https://threadforge-backend.onrender.com/api/scrape"
-const LIVE_BACKEND_URL = "PASTE_YOUR_RENDER_URL_HERE/api/scrape"; 
+const LIVE_BACKEND_URL = "https://threadforge.onrender.com"; 
 
 const apiKey = ""; // Injected by environment
 
