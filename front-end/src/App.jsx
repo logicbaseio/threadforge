@@ -91,8 +91,9 @@ async function cleanScrapedData(rawText) {
 const SettingsModal = ({ isOpen, onClose, proxyUrl, setProxyUrl }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+    // FIX: Added zIndex: 9999 to ensure this modal is ALWAYS on top of everything
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex: 9999 }}>
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
           <Settings size={20} /> Configuration
         </h3>
@@ -144,8 +145,9 @@ const SmartImportModal = ({ isOpen, onClose, onImport }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+    // FIX: Added zIndex: 9999 to ensure this modal is ALWAYS on top
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex: 9999 }}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] relative">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><FileText size={20} /> Paste Dump</h3>
           <button onClick={onClose}><X size={24} className="text-gray-400 hover:text-gray-600" /></button>
@@ -185,10 +187,11 @@ const ThreadItem = ({ item, index, isSource, onDelete, onChange, isProcessing })
             <textarea
               value={item.text}
               onChange={(e) => onChange(item.id, 'text', e.target.value)}
-              className="w-full min-h-[100px] p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-700 text-sm resize-y"
+              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-700 text-sm resize-y"
+              style={{ minHeight: '100px' }}
             />
           ) : (
-            <div className="w-full min-h-[100px] p-3 bg-white border border-indigo-100 rounded-lg text-gray-700 text-sm whitespace-pre-wrap relative group/text">
+            <div className="w-full p-3 bg-white border border-indigo-100 rounded-lg text-gray-700 text-sm whitespace-pre-wrap relative group/text" style={{ minHeight: '100px' }}>
                {isProcessing ? (
                  <div className="flex items-center justify-center h-full text-indigo-400 gap-2"><Loader2 size={16} className="animate-spin" /> Rewriting...</div>
                ) : item.text}
@@ -200,7 +203,7 @@ const ThreadItem = ({ item, index, isSource, onDelete, onChange, isProcessing })
         </div>
         <div className="relative">
           {item.media ? (
-            <div className="relative rounded-lg overflow-hidden aspect-video bg-gray-100 border border-gray-200 group/media">
+            <div className="relative rounded-lg overflow-hidden bg-gray-100 border border-gray-200 group/media" style={{ aspectRatio: '16/9' }}>
               <img src={item.media} alt="Content" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/10 transition-all flex items-center justify-center opacity-0 group-hover/media:opacity-100">
                 {isSource ? (
@@ -357,7 +360,6 @@ export default function App() {
              <button 
               onClick={handleRegenerate}
               disabled={isProcessing || !thread[0].text}
-              // FORCE COLOR: Using inline style to guarantee visibility
               style={{ backgroundColor: isProcessing || !thread[0].text ? '#d1d5db' : '#4F46E5', color: 'white' }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all shadow-md`}
             >
@@ -396,7 +398,6 @@ export default function App() {
                   <button 
                     onClick={handleUrlFetch}
                     disabled={isFetchingUrl || !urlInput}
-                    // FORCE COLOR: Using inline style to guarantee visibility
                     style={{ backgroundColor: '#1f2937', color: 'white' }}
                     className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 flex items-center gap-2"
                   >
@@ -436,7 +437,7 @@ export default function App() {
           <div className="hidden lg:flex flex-col items-center justify-center pt-32 text-gray-300"><ArrowRight size={32} /></div>
 
           <div className={`flex-1 w-full ${activeTab === 'output' ? 'block' : 'hidden lg:block'}`}>
-             <div className="bg-white rounded-2xl shadow-xl border border-indigo-100 p-6 relative overflow-hidden min-h-[500px]">
+             <div className="bg-white rounded-2xl shadow-xl border border-indigo-100 p-6 relative overflow-hidden" style={{ minHeight: '500px' }}>
                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-bl-full -z-0 opacity-50"></div>
                <div className="flex items-center justify-between mb-6 relative z-10">
                 <h2 className="text-lg font-bold flex items-center gap-2 text-indigo-900"><Wand2 size={20} className="text-indigo-500" /> Remixed Thread</h2>
