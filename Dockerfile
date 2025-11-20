@@ -13,7 +13,10 @@ COPY package*.json ./
 # Install dependencies
 # User "pptruser" is a secure user provided by the image
 USER root
-RUN npm ci
+
+# CHANGED: Switched from 'npm ci' to 'npm install' to fix missing lockfile error
+RUN npm install
+
 USER pptruser
 
 # Copy the server source code
