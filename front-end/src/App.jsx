@@ -27,7 +27,7 @@ const LIVE_BACKEND_URL = "PASTE_YOUR_RENDER_URL_HERE/api/scrape";
 
 const apiKey = ""; // Injected by environment
 
-// --- API & Utility Functions ---
+// --- API Functions ---
 
 async function callGemini(prompt, systemInstruction = "") {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
@@ -72,24 +72,15 @@ async function generateImage(prompt) {
   }
 }
 
-// --- Helper to Clean Raw Scraped Text ---
 async function cleanScrapedData(rawText) {
   const prompt = `
-    I have raw text scraped from a social media thread (Twitter/X or Facebook).
-    Extract the actual thread posts.
-    
+    I have raw text scraped from a social media thread. Extract the actual thread posts.
     Rules:
-    1. Identify the main post and threaded replies by the author.
-    2. Ignore UI text (Like, Reply, Share, Navigation, Sidebar).
+    1. Identify the main post and threaded replies.
+    2. Ignore UI text (Like, Reply, Share, Navigation).
     3. Return ONLY a valid JSON array of strings. Example: ["Post 1", "Post 2"].
-    4. If valid content is found, ignore any login prompts or error messages in the text.
-
-    Raw Text:
-    """
-    ${rawText.substring(0, 15000)}
-    """
+    Raw Text: """${rawText.substring(0, 15000)}"""
   `;
-  
   const result = await callGemini(prompt, "You are a data extraction specialist. Output strictly JSON.");
   const jsonMatch = result.match(/\[[\s\S]*\]/);
   return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
@@ -115,11 +106,11 @@ const SettingsModal = ({ isOpen, onClose, proxyUrl, setProxyUrl }) => {
             className="w-full p-3 border border-gray-200 rounded-lg text-sm"
           />
           <p className="text-xs text-gray-400 mt-2">
-            This points to your backend scraper. Ensure your Render service is live.
+            Ensure this is your Render Backend URL, NOT localhost.
           </p>
         </div>
         <div className="flex justify-end">
-          <button onClick={onClose} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
+          <button onClick={onClose} style={{backgroundColor: '#4F46E5'}} className="text-white px-4 py-2 rounded-lg text-sm font-medium">
             Save & Close
           </button>
         </div>
@@ -168,7 +159,7 @@ const SmartImportModal = ({ isOpen, onClose, onImport }) => {
           />
         </div>
         <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-          <button onClick={handleAnalyze} disabled={isAnalyzing || !text} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2">
+          <button onClick={handleAnalyze} disabled={isAnalyzing || !text} style={{backgroundColor: '#4F46E5'}} className="px-6 py-2 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2">
             {isAnalyzing ? <Loader2 className="animate-spin" /> : 'Extract Posts'}
           </button>
         </div>
@@ -179,7 +170,7 @@ const SmartImportModal = ({ isOpen, onClose, onImport }) => {
 
 const ThreadItem = ({ item, index, isSource, onDelete, onChange, isProcessing }) => {
   return (
-    <div className={`relative group border rounded-xl p-4 mb-4 transition-all duration-300 ${isSource ? 'bg-white border-gray-200 hover:border-blue-300' : 'bg-indigo-50 border-indigo-100 hover:border-indigo-300'}`}>
+    <div className={`relative group border rounded-xl p-4 mb-4 transition-all duration-300 ${isSource ? 'bg-white border-gray-200' : 'bg-indigo-50 border-indigo-100'}`}>
       <div className="flex justify-between items-center mb-3">
         <span className={`text-xs font-bold uppercase tracking-wider ${isSource ? 'text-gray-400' : 'text-indigo-400'}`}>
           {index === 0 ? 'Main Post' : `Thread #${index}`}
@@ -261,7 +252,6 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Initializing state with the hardcoded LIVE_BACKEND_URL
   const initialProxyUrl = LIVE_BACKEND_URL.includes("PASTE_YOUR_RENDER_URL_HERE") 
     ? "http://localhost:3001/api/scrape" 
     : LIVE_BACKEND_URL;
@@ -275,10 +265,16 @@ export default function App() {
 
   const handleUrlFetch = async () => {
     if (!urlInput) return;
+
+    // Validate URL format
+    if (!urlInput.startsWith('http')) {
+      alert("Please enter a valid URL starting with http:// or https://");
+      return;
+    }
     
-    // Check if user forgot to update URL
-    if (proxyUrl.includes("PASTE_YOUR_RENDER_URL_HERE")) {
-      alert("Please configure the Backend URL in the code or settings!");
+    // Debug check
+    if (proxyUrl.includes("localhost") && !window.location.hostname.includes("localhost")) {
+      alert(`⚠️ CONNECTION ERROR: You are trying to connect to 'localhost' from a live website.\n\nPlease click the Settings (Gear Icon) and enter your Render Backend URL.`);
       setIsSettingsOpen(true);
       return;
     }
@@ -311,7 +307,7 @@ export default function App() {
 
     } catch (e) {
       console.error(e);
-      alert(`Fetch failed. Check your proxy URL in Settings.`);
+      alert(`Fetch failed! \n\n1. Check if your Backend URL is correct in Settings.\n2. Make sure your Backend is running.\n\nError: ${e.message}`);
     } finally {
       setIsFetchingUrl(false);
     }
@@ -342,7 +338,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans selection:bg-indigo-100 selection:text-indigo-700">
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
       <SmartImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={(posts) => {
         setThread(posts.map((t, i) => ({ id: Date.now() + i, text: t, media: null })));
         setGeneratedThread([]);
@@ -354,14 +350,16 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-indigo-600 p-2 rounded-lg text-white"><RefreshCw size={20} className={isProcessing ? "animate-spin" : ""} /></div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">ThreadForge</h1>
+            <h1 className="text-xl font-bold text-gray-900">ThreadForge</h1>
           </div>
           <div className="flex items-center gap-4">
              <button onClick={() => setIsSettingsOpen(true)} className="text-gray-400 hover:text-gray-600"><Settings size={20} /></button>
              <button 
               onClick={handleRegenerate}
               disabled={isProcessing || !thread[0].text}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-white transition-all shadow-md ${isProcessing || !thread[0].text ? 'bg-gray-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+              // FORCE COLOR: Using inline style to guarantee visibility
+              style={{ backgroundColor: isProcessing || !thread[0].text ? '#d1d5db' : '#4F46E5', color: 'white' }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all shadow-md`}
             >
               {isProcessing ? <><Loader2 size={18} className="animate-spin" /> Remixing...</> : <><Wand2 size={18} /> Remix Thread</>}
             </button>
@@ -398,7 +396,9 @@ export default function App() {
                   <button 
                     onClick={handleUrlFetch}
                     disabled={isFetchingUrl || !urlInput}
-                    className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 flex items-center gap-2"
+                    // FORCE COLOR: Using inline style to guarantee visibility
+                    style={{ backgroundColor: '#1f2937', color: 'white' }}
+                    className="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 flex items-center gap-2"
                   >
                     {isFetchingUrl ? <Loader2 size={16} className="animate-spin" /> : 'Fetch'}
                   </button>
