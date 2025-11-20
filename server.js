@@ -5,9 +5,15 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Enable CORS to allow your frontend to talk to this server
+// Enable CORS for all domains
 app.use(cors());
 app.use(express.json());
+
+// 1. Health Check Route
+// Open your backend URL in a browser to see this message and wake up the server!
+app.get('/', (req, res) => {
+  res.send('ThreadForge Backend is Active and Running!');
+});
 
 app.post('/api/scrape', async (req, res) => {
   const { url } = req.body;
@@ -16,35 +22,49 @@ app.post('/api/scrape', async (req, res) => {
     return res.status(400).json({ error: 'URL is required' });
   }
 
+  console.log(`Received scrape request for: ${url}`);
+
   let browser;
   try {
-    // Launch a headless browser
-    // Note: For deployment on platforms like Render/Heroku, you may need specific args
+    // Launch browser with memory-saving flags for Free Tier hosting
     browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // Uses the Docker image's Chrome
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // Crucial for Docker/Render memory limits
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process', 
+        '--disable-gpu'
+      ]
     });
 
     const page = await browser.newPage();
     
-    // Set a realistic User-Agent to avoid being blocked immediately
+    // Block images/fonts/css to save bandwidth and speed up scraping
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    // Set a realistic User-Agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
 
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    // Timeout set to 30s to fail faster if stuck
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Extract text content
-    const rawText = await page.evaluate(() => {
-      return document.body.innerText;
-    });
+    const rawText = await page.evaluate(() => document.body.innerText);
 
-    // Extract images (basic extraction)
-    const images = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('img'))
-        .map(img => img.src)
-        .filter(src => src.startsWith('http'));
-    });
-
-    res.json({ text: rawText, images });
+    console.log("Scrape successful");
+    res.json({ text: rawText, images: [] }); // Sending empty images array as we blocked loading them for speed
 
   } catch (error) {
     console.error('Scraping failed:', error);
