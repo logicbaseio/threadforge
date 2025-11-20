@@ -5,75 +5,88 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Enable CORS for all domains
 app.use(cors());
 app.use(express.json());
 
-// 1. Health Check Route
-// Open your backend URL in a browser to see this message and wake up the server!
-app.get('/', (req, res) => {
-  res.send('ThreadForge Backend is Active and Running!');
-});
+app.get('/', (req, res) => res.send('ThreadForge Backend is Active!'));
 
 app.post('/api/scrape', async (req, res) => {
-  const { url } = req.body;
+  if (!req.body.url) return res.status(400).json({ error: 'Missing URL' });
 
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
-
-  console.log(`Received scrape request for: ${url}`);
+  console.log(`Scraping: ${req.body.url}`);
 
   let browser;
   try {
-    // Launch browser with memory-saving flags for Free Tier hosting
     browser = await puppeteer.launch({
       headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // Uses the Docker image's Chrome
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage', // Crucial for Docker/Render memory limits
+        '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process', 
-        '--disable-gpu'
+        '--disable-gpu',
+        '--single-process',
+        '--no-zygote'
       ]
     });
 
     const page = await browser.newPage();
-    
-    // Block images/fonts/css to save bandwidth and speed up scraping
+
+    // 1. Set User-Agent (Helps with Facebook/Twitter)
+    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
+
+    // 2. Allow CSS/Scripts (Required for modern social apps)
     await page.setRequestInterception(true);
     page.on('request', (req) => {
-      if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
+      const resourceType = req.resourceType();
+      if (['image', 'media', 'font', 'other'].includes(resourceType)) {
         req.abort();
       } else {
         req.continue();
       }
     });
 
-    // Set a realistic User-Agent
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
+    // 3. Navigate
+    await page.goto(req.body.url, { waitUntil: 'networkidle2', timeout: 45000 });
+    
+    // 4. AUTO-SCROLL (NEW): Essential for Facebook/Twitter Threads
+    // This scrolls down to trigger the loading of replies/comments
+    await page.evaluate(async () => {
+        await new Promise((resolve) => {
+            let totalHeight = 0;
+            const distance = 100;
+            const timer = setInterval(() => {
+                const scrollHeight = document.body.scrollHeight;
+                window.scrollBy(0, distance);
+                totalHeight += distance;
 
-    // Timeout set to 30s to fail faster if stuck
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                // Scroll for about 2000px (enough for a good thread) or until bottom
+                if (totalHeight >= 2000 || totalHeight >= scrollHeight) {
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 100); // Scroll every 100ms
+        });
+    });
 
-    // Extract text content
-    const rawText = await page.evaluate(() => document.body.innerText);
+    // 5. Final wait for any lazy-loaded content to render
+    await new Promise(r => setTimeout(r, 2000));
 
-    console.log("Scrape successful");
-    res.json({ text: rawText, images: [] }); // Sending empty images array as we blocked loading them for speed
+    const text = await page.evaluate(() => document.body.innerText);
+    
+    if (!text || text.length < 50) {
+        throw new Error("Page loaded but contained insufficient text. Possible bot block.");
+    }
 
-  } catch (error) {
-    console.error('Scraping failed:', error);
-    res.status(500).json({ error: 'Failed to scrape URL', details: error.message });
+    res.json({ text, images: [] });
+
+  } catch (e) {
+    console.error("Scrape Error:", e.message);
+    res.status(500).json({ error: 'Scrape failed', details: e.message });
   } finally {
     if (browser) await browser.close();
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Proxy server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Running on ${PORT}`));
